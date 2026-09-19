@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Atenuación Pasiva — Control de Señales No Autorizadas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1b2a;
+    --bg-panel: #13263b;
+    --bg-panel-2: #0a1622;
+    --grid-line: rgba(140, 178, 214, 0.09);
+    --paper: #dbe7f2;
+    --text-primary: #e8f0f8;
+    --text-muted: #7f9bb8;
+    --text-dim: #506d8a;
+    --accent-warn: #ff6a3d;
+    --accent-safe: #3ee6a8;
+    --accent-mid: #ffc857;
+    --stroke-soft: rgba(140, 178, 214, 0.18);
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  :root[data-theme="light"] {
+    --bg: #eef2f6;
+    --bg-panel: #ffffff;
+    --bg-panel-2: #e4eaf1;
+    --grid-line: rgba(30, 60, 90, 0.06);
+    --paper: #16283f;
+    --text-primary: #14202e;
+    --text-muted: #4a627c;
+    --text-dim: #7f93a8;
+    --stroke-soft: rgba(20, 40, 60, 0.12);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #eef2f6;
+      --bg-panel: #ffffff;
+      --bg-panel-2: #e4eaf1;
+      --grid-line: rgba(30, 60, 90, 0.06);
+      --paper: #16283f;
+      --text-primary: #14202e;
+      --text-muted: #4a627c;
+      --text-dim: #7f93a8;
+      --stroke-soft: rgba(20, 40, 60, 0.12);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+  }
+  body {
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+  header.top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    border-bottom: 1px solid var(--stroke-soft);
+    padding-bottom: 18px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .brand-mark {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .brand-mark .tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    border: 1px solid var(--stroke-soft);
+    border-radius: 3px;
+    padding: 2px 7px;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(22px, 3.4vw, 32px);
+    margin: 6px 0 4px;
+    letter-spacing: -0.01em;
+    max-width: 640px;
+  }
+  .subhead {
+    color: var(--text-muted);
+    font-size: 13px;
+    max-width: 560px;
+    line-height: 1.55;
+  }
+  .status-chip {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--accent-safe);
+    border: 1px solid rgba(62, 230, 168, 0.35);
+    background: rgba(62, 230, 168, 0.08);
+    border-radius: 4px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--stroke-soft);
+    border-radius: 6px;
+    padding: 18px;
+  }
+  .panel + .panel { margin-top: 18px; }
+
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 14px;
+  }
+  .panel-title .idx {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    border: 1px solid var(--stroke-soft);
+    border-radius: 3px;
+    padding: 1px 6px;
+  }
+
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .field label span.val {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 3px;
+    background: var(--stroke-soft);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent-mid);
+    cursor: pointer;
+    border: 2px solid var(--bg-panel);
+    box-shadow: 0 0 0 1px var(--accent-mid);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent-mid);
+    cursor: pointer;
+    border: 2px solid var(--bg-panel);
+  }
+
+  .seg {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .seg button {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    text-align: left;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--stroke-soft);
+    color: var(--text-muted);
+    padding: 9px 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .seg button .mini {
+    font-size: 10.5px;
+    color: var(--text-dim);
+  }
+  .seg button.active {
+    color: var(--text-primary);
+    border-color: var(--accent-mid);
+  }
+  .seg button.active .mini { color: var(--accent-mid); }
+  .seg button:hover { color: var(--text-primary); }
+
+  .divider {
+    height: 1px;
+    background: var(--stroke-soft);
+    margin: 16px 0;
+  }
+
+  .note {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  /* Cross-section */
+  .cross-section {
+    position: relative;
+  }
+  svg { display: block; width: 100%; height: auto; }
+  .cell-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    fill: var(--text-dim);
+  }
+
+  /* Results table */
+  table.results {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  table.results th {
+    text-align: left;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--stroke-soft);
+  }
+  table.results td {
+    padding: 10px 10px;
+    border-bottom: 1px solid var(--stroke-soft);
+    color: var(--text-primary);
+  }
+  table.results tr:last-child td { border-bottom: none; }
+  .tech-name { font-weight: 600; }
+  .tech-freq { color: var(--text-dim); font-size: 11px; }
+  .bar-track {
+    position: relative;
+    height: 6px;
+    background: var(--bg-panel-2);
+    border-radius: 3px;
+    overflow: hidden;
+    width: 100%;
+    min-width: 90px;
+  }
+  .bar-fill { position: absolute; top:0; left:0; height:100%; border-radius: 3px; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .pill.safe { background: rgba(62,230,168,0.12); color: var(--accent-safe); }
+  .pill.warn { background: rgba(255,106,61,0.14); color: var(--accent-warn); }
+  .pill.mid { background: rgba(255,200,87,0.14); color: var(--accent-mid); }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .formula-box {
+    background: var(--bg-panel-2);
+    border: 1px solid var(--stroke-soft);
+    border-radius: 5px;
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--text-primary);
+    line-height: 1.9;
+    overflow-x: auto;
+  }
+  .formula-box .comment { color: var(--text-dim); }
+  .formula-box .op { color: var(--accent-mid); }
+
+  .grid-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 620px) { .grid-two { grid-template-columns: 1fr; } }
+
+  .stat-card {
+    background: var(--bg-panel-2);
+    border: 1px solid var(--stroke-soft);
+    border-radius: 5px;
+    padding: 12px 14px;
+  }
+  .stat-card .label {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    text-transform: none;
+    margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 600;
+  }
+  .stat-card .value .unit {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-left: 3px;
+  }
+
+  footer.legal {
+    margin-top: 26px;
+    padding-top: 16px;
+    border-top: 1px solid var(--stroke-soft);
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  footer.legal strong { color: var(--text-muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <div class="brand-mark">
+        <span class="tag">RF-2040 · PASIVO</span>
+      </div>
+      <h1>Control conceptual de señales no autorizadas</h1>
+      <div class="subhead">Simulador de atenuación pasiva por blindaje estructural en centros penitenciarios — comparación de pérdida de espacio libre (FSPL) contra atenuación de materiales de construcción.</div>
+    </div>
+    <div class="status-chip" id="statusChip">● modo: blindaje pasivo</div>
+  </header>
+
+  <div class="layout">
+
+    <!-- LEFT: CONTROLS -->
+    <div class="controls-col">
+      <div class="panel">
+        <div class="panel-title"><span class="idx">01</span> Geometría del recinto</div>
+
+        <div class="field">
+          <label>Distancia a la antena externa <span class="val" id="distVal">1.2 km</span></label>
+          <input type="range" id="distSlider" min="0.1" max="5" step="0.1" value="1.2">
+        </div>
+
+        <div class="field">
+          <label>Espesor del muro <span class="val" id="thickVal">0.30 m</span></label>
+          <input type="range" id="thickSlider" min="0.05" max="1.5" step="0.01" value="0.30">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span class="idx">02</span> Material de blindaje</div>
+        <div class="seg" id="materialSeg"></div>
+        <div class="divider"></div>
+        <p class="note" id="materialNote"></p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span class="idx">03</span> Parámetro de referencia</div>
+        <div class="field" style="margin-bottom:0;">
+          <label>Potencia EIRP de la torre externa <span class="val" id="ptxVal">43 dBm</span></label>
+          <input type="range" id="ptxSlider" min="30" max="50" step="1" value="43">
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: VISUAL + RESULTS -->
+    <div class="results-col">
+
+      <div class="panel">
+        <div class="panel-title"><span class="idx">04</span> Corte transversal — trayecto de la señal</div>
+        <div class="cross-section">
+          <svg viewBox="0 0 900 220" id="crossSvg"></svg>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span class="idx">05</span> Balance de potencia por tecnología</div>
+        <table class="results">
+          <thead>
+            <tr>
+              <th>Tecnología</th>
+              <th>FSPL</th>
+              <th>Atenuación muro</th>
+              <th>Nivel interior</th>
+              <th style="width:110px;">Margen vs. umbral</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+        <div class="divider"></div>
+        <p class="note">Umbral de comunicación asumido: <strong style="color:var(--text-muted)">-95 dBm</strong>. Por debajo de este nivel, un equipo móvil típico pierde enlace con la red celular. FSPL = 20·log₁₀(d_km) + 20·log₁₀(f_MHz) + 32.44 (modelo de espacio libre, ITU-R P.525).</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><span class="idx">06</span> Relación λ (longitud de onda) vs. frecuencia</div>
+        <div class="grid-two" id="lambdaCards"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="legal">
+    <strong>Alcance del modelo.</strong> Este simulador ilustra principios de propagación (FSPL) y atenuación pasiva por materiales con fines académicos, conforme al enfoque de blindaje confinado descrito en el proyecto. No emite, calcula ni facilita señales de interferencia activa (jamming); los coeficientes de absorción son valores pedagógicos aproximados y deben validarse con mediciones de campo (pérdida de inserción) para cualquier aplicación real. El diseño de soluciones de conectividad en centros penitenciarios está sujeto a la Ley General de Telecomunicaciones y a la supervisión de la SIT.
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  // ---- Data model ----
+  var TECHS = [
+    { id: '2g', name: '2G / GSM', freqMHz: 850, lambda: 35.3 },
+    { id: '3g', name: '3G / UMTS', freqMHz: 1900, lambda: 15.8 },
+    { id: '4g', name: '4G / LTE', freqMHz: 2100, lambda: 14.3 },
+    { id: '5gsub6', name: '5G (Sub-6)', freqMHz: 3500, lambda: 8.6 },
+    { id: '5gmm', name: '5G (mmWave)', freqMHz: 28000, lambda: 1.07 }
+  ];
+
+  // Illustrative attenuation coefficients in dB/m, increasing with frequency.
+  // Pedagogical approximations inspired by general trends in ITU-R P.2040 (building material penetration).
+  var MATERIALS = {
+    concreto: {
+      label: 'Concreto reforzado',
+      mini: 'estructural / denso',
+      coeffs: { 850: 4.0, 1900: 6.2, 2100: 7.0, 3500: 12.5, 28000: 46.0 },
+      note: 'El acero de refuerzo actúa como rejilla parcial: buena atenuación en bandas altas, moderada en 2G/3G a igual espesor.'
+    },
+    ladrillo: {
+      label: 'Ladrillo / mampostería',
+      mini: 'liviano / poroso',
+      coeffs: { 850: 1.8, 1900: 2.9, 2100: 3.4, 3500: 6.0, 28000: 21.0 },
+      note: 'Material poroso: requiere muros mucho más gruesos para llevar 850 MHz bajo el umbral de comunicación.'
+    },
+    malla: {
+      label: 'Malla de acero (Jaula de Faraday)',
+      mini: 'blindaje EM dedicado',
+      coeffs: { 850: 16.0, 1900: 26.0, 2100: 29.0, 3500: 42.0, 28000: 95.0 },
+      note: 'Blindaje electromagnético dedicado: satura la atenuación en todas las bandas incluso con espesores mínimos.'
+    }
+  };
+
+  var state = {
+    distKm: 1.2,
+    thickM: 0.30,
+    material: 'concreto',
+    ptxDbm: 43
+  };
+
+  var THRESHOLD = -95;
+
+  // ---- Elements ----
+  var distSlider = document.getElementById('distSlider');
+  var thickSlider = document.getElementById('thickSlider');
+  var ptxSlider = document.getElementById('ptxSlider');
+  var distVal = document.getElementById('distVal');
+  var thickVal = document.getElementById('thickVal');
+  var ptxVal = document.getElementById('ptxVal');
+  var materialSeg = document.getElementById('materialSeg');
+  var materialNote = document.getElementById('materialNote');
+  var resultsBody = document.getElementById('resultsBody');
+  var lambdaCards = document.getElementById('lambdaCards');
+  var crossSvg = document.getElementById('crossSvg');
+  var statusChip = document.getElementById('statusChip');
+
+  // ---- Build material buttons ----
+  Object.keys(MATERIALS).forEach(function (key) {
+    var m = MATERIALS[key];
+    var btn = document.createElement('button');
+    btn.dataset.key = key;
+    btn.innerHTML = '<span>' + m.label + '</span><span class="mini">' + m.mini + '</span>';
+    btn.addEventListener('click', function () {
+      state.material = key;
+      render();
+    });
+    materialSeg.appendChild(btn);
+  });
+
+  // ---- Physics ----
+  function fspl(dKm, fMHz) {
+    return 20 * Math.log10(dKm) + 20 * Math.log10(fMHz) + 32.44;
+  }
+
+  function computeRow(tech) {
+    var loss = fspl(state.distKm, tech.freqMHz);
+    var outdoor = state.ptxDbm - loss;
+    var matCoeff = MATERIALS[state.material].coeffs[tech.freqMHz];
+    var wallAtten = matCoeff * state.thickM;
+    var indoor = outdoor - wallAtten;
+    var margin = THRESHOLD - indoor; // positive = below threshold (blocked), negative = still communicable
+    return { tech: tech, loss: loss, outdoor: outdoor, wallAtten: wallAtten, indoor: indoor, margin: margin };
+  }
+
+  function statusFor(margin) {
+    if (margin >= 8) return { key: 'safe', label: 'Bloqueada' };
+    if (margin >= 0) return { key: 'mid', label: 'Marginal' };
+    return { key: 'warn', label: 'Con enlace' };
+  }
+
+  // ---- Render results table ----
+  function renderTable() {
+    var rows = TECHS.map(computeRow);
+    var maxAtten = Math.max.apply(null, rows.map(function (r) { return r.wallAtten; })) || 1;
+
+    resultsBody.innerHTML = '';
+    rows.forEach(function (r) {
+      var st = statusFor(r.margin);
+      var tr = document.createElement('tr');
+
+      var barPct = Math.min(100, (r.wallAtten / (maxAtten * 1.15)) * 100);
+
+      tr.innerHTML =
+        '<td><div class="tech-name">' + r.tech.name + '</div><div class="tech-freq">' + formatFreq(r.tech.freqMHz) + '</div></td>' +
+        '<td>' + r.loss.toFixed(1) + ' dB</td>' +
+        '<td><div class="bar-track"><div class="bar-fill" style="width:' + barPct.toFixed(0) + '%; background:' + colorForStatus(st.key) + '"></div></div>' +
+          '<div style="margin-top:4px; color:var(--text-dim); font-size:10.5px;">' + r.wallAtten.toFixed(1) + ' dB</div></td>' +
+        '<td>' + r.indoor.toFixed(1) + ' dBm</td>' +
+        '<td>' + (r.margin >= 0 ? '+' : '') + r.margin.toFixed(1) + ' dB</td>' +
+        '<td><span class="pill ' + st.key + '"><span class="dot"></span>' + st.label + '</span></td>';
+      resultsBody.appendChild(tr);
+    });
+
+    var blockedCount = rows.filter(function (r) { return statusFor(r.margin).key === 'safe'; }).length;
+    if (blockedCount === TECHS.length) {
+      statusChip.textContent = '● todas las bandas bajo el umbral';
+      statusChip.style.color = 'var(--accent-safe)';
+    } else if (blockedCount === 0) {
+      statusChip.textContent = '● ninguna banda atenuada lo suficiente';
+      statusChip.style.color = 'var(--accent-warn)';
+    } else {
+      statusChip.textContent = '● ' + blockedCount + ' de ' + TECHS.length + ' bandas bloqueadas';
+      statusChip.style.color = 'var(--accent-mid)';
+    }
+  }
+
+  function colorForStatus(key) {
+    if (key === 'safe') return 'var(--accent-safe)';
+    if (key === 'mid') return 'var(--accent-mid)';
+    return 'var(--accent-warn)';
+  }
+
+  function formatFreq(fMHz) {
+    if (fMHz >= 1000) return (fMHz / 1000).toFixed(fMHz % 1000 === 0 ? 0 : 1) + ' GHz';
+    return fMHz + ' MHz';
+  }
+
+  // ---- Lambda cards ----
+  function renderLambda() {
+    lambdaCards.innerHTML = '';
+    TECHS.forEach(function (t) {
+      var wavelengthCm = (299792458 / (t.freqMHz * 1e6)) * 100;
+      var div = document.createElement('div');
+      div.className = 'stat-card';
+      div.innerHTML =
+        '<div class="label">' + t.name + ' · ' + formatFreq(t.freqMHz) + '</div>' +
+        '<div class="value">' + (wavelengthCm >= 10 ? wavelengthCm.toFixed(1) : wavelengthCm.toFixed(2)) + '<span class="unit">cm λ</span></div>';
+      lambdaCards.appendChild(div);
+    });
+  }
+
+  // ---- Cross-section SVG ----
+  function renderCrossSection() {
+    var thickPx = 14 + (state.thickM / 1.5) * 70; // visual scale
+    var wallX = 480;
+    var svgNS = 'http://www.w3.org/2000/svg';
+    crossSvg.innerHTML = '';
+
+    function el(tag, attrs) {
+      var e = document.createElementNS(svgNS, tag);
+      Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+      return e;
+    }
+
+    // ground line
+    crossSvg.appendChild(el('line', { x1: 20, y1: 190, x2: 880, y2: 190, stroke: 'var(--stroke-soft)', 'stroke-width': 1 }));
+
+    // tower
+    crossSvg.appendChild(el('line', { x1: 60, y1: 190, x2: 60, y2: 60, stroke: 'var(--text-dim)', 'stroke-width': 2 }));
+    crossSvg.appendChild(el('circle', { cx: 60, cy: 55, r: 5, fill: 'var(--accent-mid)' }));
+    var towerLabel = el('text', { x: 60, y: 205, 'text-anchor': 'middle', class: 'cell-label' });
+    towerLabel.textContent = 'ANTENA EXTERNA';
+    crossSvg.appendChild(towerLabel);
+
+    // distance dashed line
+    crossSvg.appendChild(el('line', { x1: 60, y1: 100, x2: wallX, y2: 100, stroke: 'var(--stroke-soft)', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
+    var distLabel = el('text', { x: (60 + wallX) / 2, y: 92, 'text-anchor': 'middle', class: 'cell-label' });
+    distLabel.textContent = state.distKm.toFixed(1) + ' km';
+    crossSvg.appendChild(distLabel);
+
+    // wall
+    var matColor = state.material === 'malla' ? '#9fb6cc' : (state.material === 'concreto' ? '#6f88a3' : '#8a6a52');
+    crossSvg.appendChild(el('rect', { x: wallX, y: 40, width: thickPx, height: 150, fill: matColor, opacity: 0.85, rx: 2 }));
+
+    if (state.material === 'malla') {
+      // hatch pattern to suggest mesh
+      for (var i = 0; i < thickPx; i += 6) {
+        crossSvg.appendChild(el('line', { x1: wallX + i, y1: 40, x2: wallX + i, y2: 190, stroke: '#0d1b2a', 'stroke-width': 0.6, opacity: 0.5 }));
+      }
+    }
+
+    var wallLabel = el('text', { x: wallX + thickPx / 2, y: 205, 'text-anchor': 'middle', class: 'cell-label' });
+    wallLabel.textContent = MATERIALS[state.material].label.toUpperCase() + ' · ' + state.thickM.toFixed(2) + ' M';
+    crossSvg.appendChild(wallLabel);
+
+    // interior cell block
+    crossSvg.appendChild(el('rect', { x: wallX + thickPx + 10, y: 40, width: 380, height: 150, fill: 'none', stroke: 'var(--stroke-soft)', 'stroke-width': 1, 'stroke-dasharray': '3 3' }));
+    var interiorLabel = el('text', { x: wallX + thickPx + 200, y: 205, 'text-anchor': 'middle', class: 'cell-label' });
+    interiorLabel.textContent = 'PERÍMETRO INTERNO — CELDAS';
+    crossSvg.appendChild(interiorLabel);
+
+    // signal rays: one per tech, colored by status, arriving at varying depth based on remaining margin
+    var rows = TECHS.map(computeRow);
+    rows.forEach(function (r, idx) {
+      var st = statusFor(r.margin);
+      var y = 65 + idx * 26;
+      var maxPenetration = 350;
+      var penetration = st.key === 'safe' ? Math.max(20, 60 - r.margin * 3) : Math.min(maxPenetration, maxPenetration * 0.35 + Math.abs(r.margin) * 12);
+      var xStart = 60;
+      var xWallEnd = wallX + thickPx;
+      var xEnd = Math.min(xWallEnd + penetration, wallX + thickPx + 370);
+
+      crossSvg.appendChild(el('line', { x1: xStart, y1: y, x2: wallX, y2: y, stroke: colorForStatus(st.key), 'stroke-width': 1.4, opacity: 0.55 }));
+      crossSvg.appendChild(el('line', { x1: wallX, y1: y, x2: xEnd, y2: y, stroke: colorForStatus(st.key), 'stroke-width': 1.4, opacity: st.key === 'safe' ? 0.25 : 0.8, 'stroke-dasharray': st.key === 'safe' ? '2 3' : 'none' }));
+
+      var rayLabel = el('text', { x: 66, y: y - 4, class: 'cell-label', fill: colorForStatus(st.key) });
+      rayLabel.textContent = r.tech.name;
+      crossSvg.appendChild(rayLabel);
+    });
+  }
+
+  // ---- Update UI + render ----
+  function updateActiveSeg() {
+    Array.prototype.forEach.call(materialSeg.children, function (btn) {
+      btn.classList.toggle('active', btn.dataset.key === state.material);
+    });
+    materialNote.textContent = MATERIALS[state.material].note;
+  }
+
+  function render() {
+    updateActiveSeg();
+    renderTable();
+    renderLambda();
+    renderCrossSection();
+  }
+
+  distSlider.addEventListener('input', function () {
+    state.distKm = parseFloat(distSlider.value);
+    distVal.textContent = state.distKm.toFixed(1) + ' km';
+    render();
+  });
+  thickSlider.addEventListener('input', function () {
+    state.thickM = parseFloat(thickSlider.value);
+    thickVal.textContent = state.thickM.toFixed(2) + ' m';
+    render();
+  });
+  ptxSlider.addEventListener('input', function () {
+    state.ptxDbm = parseFloat(ptxSlider.value);
+    ptxVal.textContent = state.ptxDbm + ' dBm';
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
